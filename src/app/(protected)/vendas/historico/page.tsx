@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { formatCurrency, formatDate } from '@/lib/format'
+import Toast from '@/components/Toast'
 import type { SaleWithItems } from '@/lib/supabase'
 
 const PERIODS = [
@@ -19,8 +20,11 @@ export default function HistoricoPage() {
   const [payment, setPayment] = useState('Todos')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  useEffect(() => {
+  function load() {
     setLoading(true)
     const params = new URLSearchParams({ period })
     if (payment !== 'Todos') params.set('payment', payment)
@@ -29,7 +33,23 @@ export default function HistoricoPage() {
       setPage(1)
       setLoading(false)
     })
-  }, [period, payment])
+  }
+
+  useEffect(() => { load() }, [period, payment])
+
+  async function handleDelete() {
+    if (!confirmId) return
+    setDeleting(true)
+    const res = await fetch(`/api/sales/${confirmId}`, { method: 'DELETE' })
+    setDeleting(false)
+    setConfirmId(null)
+    if (res.ok) {
+      setToast({ msg: 'Venda excluída.', type: 'success' })
+      load()
+    } else {
+      setToast({ msg: 'Erro ao excluir venda.', type: 'error' })
+    }
+  }
 
   const total = sales.reduce((s, r) => s + r.total, 0)
   const paged = sales.slice(0, page * PAGE_SIZE)
@@ -76,13 +96,14 @@ export default function HistoricoPage() {
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Pagamento</th>
               <th className="text-right px-4 py-3 font-semibold text-gray-600">Total</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Obs.</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             ) : paged.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-400">Nenhuma venda encontrada.</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-gray-400">Nenhuma venda encontrada.</td></tr>
             ) : paged.map(sale => (
               <tr key={sale.id} className="border-b last:border-0 hover:bg-gray-50">
                 <td className="px-4 py-3 whitespace-nowrap text-gray-500">{formatDate(sale.created_at)}</td>
@@ -100,6 +121,15 @@ export default function HistoricoPage() {
                 </td>
                 <td className="px-4 py-3 text-right font-semibold">{formatCurrency(sale.total)}</td>
                 <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{sale.notes ?? '—'}</td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => setConfirmId(sale.id)}
+                    className="text-red-400 hover:text-red-600 text-xs font-medium hover:underline"
+                    title="Excluir venda"
+                  >
+                    Excluir
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -116,6 +146,32 @@ export default function HistoricoPage() {
           </button>
         </div>
       )}
+
+      {confirmId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-bold text-gray-800 text-lg">Excluir venda?</h3>
+            <p className="text-sm text-gray-500">Esta ação não pode ser desfeita. A venda e todos os seus itens serão removidos permanentemente.</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmId(null)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-lg font-medium"
+              >
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )
 }
