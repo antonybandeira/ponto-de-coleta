@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
+import { startOfDayBRT, startOfMonthBRT } from '@/lib/format'
 
 export async function GET(request: NextRequest) {
   const supabase = getSupabase()
@@ -14,14 +15,12 @@ export async function GET(request: NextRequest) {
 
   const now = new Date()
   if (period === 'today') {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    query = query.gte('created_at', start)
+    query = query.gte('created_at', startOfDayBRT(now).toISOString())
   } else if (period === 'week') {
-    const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    query = query.gte('created_at', start)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    query = query.gte('created_at', startOfDayBRT(sevenDaysAgo).toISOString())
   } else if (period === 'month') {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    query = query.gte('created_at', start)
+    query = query.gte('created_at', startOfMonthBRT(now).toISOString())
   }
 
   if (payment) query = query.eq('payment_method', payment)

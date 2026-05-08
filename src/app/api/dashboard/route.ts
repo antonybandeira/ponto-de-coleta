@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
+import { startOfDayBRT, startOfMonthBRT } from '@/lib/format'
 
 export async function GET() {
   const supabase = getSupabase()
   const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const thirtyDaysAgo = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000)
-  thirtyDaysAgo.setHours(0, 0, 0, 0)
+  const todayStart = startOfDayBRT(now).toISOString()
+  const monthStart = startOfMonthBRT(now).toISOString()
+  const thirtyDaysAgo = startOfDayBRT(new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000))
 
   const [todaySales, monthSales, openOccurrences, last30Sales] = await Promise.all([
     supabase.from('sales').select('id, total').gte('created_at', todayStart),
