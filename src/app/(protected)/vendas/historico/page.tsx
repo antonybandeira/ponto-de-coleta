@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { formatCurrency, formatDate } from '@/lib/format'
 import Toast from '@/components/Toast'
 import type { SaleWithItems } from '@/lib/supabase'
@@ -12,30 +12,46 @@ const PERIODS = [
 ]
 
 const PAYMENTS = ['Todos', 'Dinheiro', 'Pix', 'Cartão Crédito', 'Cartão Débito']
-const PAGE_SIZE = 20
+
+type ApiResponse = {
+  data: SaleWithItems[]
+  totalCount: number
+  totalAmount: number
+  hasMore: boolean
+}
 
 export default function HistoricoPage() {
   const [sales, setSales] = useState<SaleWithItems[]>([])
   const [period, setPeriod] = useState('month')
   const [payment, setPayment] = useState('Todos')
   const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalAmount, setTotalAmount] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  function load() {
+  const fetchPage = useCallback((p: number, append: boolean, currentPeriod: string, currentPayment: string) => {
     setLoading(true)
-    const params = new URLSearchParams({ period })
-    if (payment !== 'Todos') params.set('payment', payment)
-    fetch(`/api/sales?${params}`).then(r => r.json()).then((data: SaleWithItems[]) => {
-      setSales(data)
-      setPage(1)
-      setLoading(false)
-    })
-  }
+    const params = new URLSearchParams({ period: currentPeriod, page: String(p) })
+    if (currentPayment !== 'Todos') params.set('payment', currentPayment)
+    fetch(`/api/sales?${params}`)
+      .then(r => r.json())
+      .then(({ data, hasMore, totalAmount, totalCount }: ApiResponse) => {
+        setSales(prev => append ? [...prev, ...data] : data)
+        setHasMore(hasMore)
+        setTotalAmount(totalAmount)
+        setTotalCount(totalCount)
+        setPage(p)
+        setLoading(false)
+      })
+  }, [])
 
-  useEffect(() => { load() }, [period, payment])
+  useEffect(() => {
+    fetchPage(1, false, period, payment)
+  }, [period, payment, fetchPage])
 
   async function handleDelete() {
     if (!confirmId) return
@@ -45,22 +61,18 @@ export default function HistoricoPage() {
     setConfirmId(null)
     if (res.ok) {
       setToast({ msg: 'Venda excluída.', type: 'success' })
-      load()
+      fetchPage(1, false, period, payment)
     } else {
       setToast({ msg: 'Erro ao excluir venda.', type: 'error' })
     }
   }
-
-  const total = sales.reduce((s, r) => s + r.total, 0)
-  const paged = sales.slice(0, page * PAGE_SIZE)
-  const hasMore = paged.length < sales.length
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-800">Histórico de Vendas</h1>
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-green-700 font-semibold">
-          Total: {formatCurrency(total)} ({sales.length} vendas)
+          Total: {formatCurrency(totalAmount)} ({totalCount} venda{totalCount !== 1 ? 's' : ''})
         </div>
       </div>
 
@@ -100,11 +112,11 @@ export default function HistoricoPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-400">Carregando...</td></tr>
-            ) : paged.length === 0 ? (
+            {loading && sales.length === 0 ? (
+              <tr><td colSpan={6} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+            ) : sales.length === 0 ? (
               <tr><td colSpan={6} className="text-center py-8 text-gray-400">Nenhuma venda encontrada.</td></tr>
-            ) : paged.map(sale => (
+            ) : sales.map(sale => (
               <tr key={sale.id} className="border-b last:border-0 hover:bg-gray-50">
                 <td className="px-4 py-3 whitespace-nowrap text-gray-500">{formatDate(sale.created_at)}</td>
                 <td className="px-4 py-3">
@@ -139,10 +151,11 @@ export default function HistoricoPage() {
       {hasMore && (
         <div className="text-center">
           <button
-            onClick={() => setPage(p => p + 1)}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+            onClick={() => fetchPage(page + 1, true, period, payment)}
+            disabled={loading}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
-            Carregar mais
+            {loading ? 'Carregando...' : 'Carregar mais'}
           </button>
         </div>
       )}

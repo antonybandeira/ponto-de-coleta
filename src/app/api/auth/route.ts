@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   }
 
   const res = NextResponse.json({ ok: true })
-  res.cookies.set('auth_token', 'authenticated', {
+  res.cookies.set('auth_token', process.env.AUTH_SECRET!, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

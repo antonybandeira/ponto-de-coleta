@@ -7,7 +7,7 @@ export function proxy(request: NextRequest) {
   if (isPublic) return NextResponse.next()
 
   const token = request.cookies.get('auth_token')?.value
-  if (!token) {
+  if (!token || token !== process.env.AUTH_SECRET) {
     const url = request.nextUrl.clone()
     url.pathname = '/pin'
     return NextResponse.redirect(url)

@@ -2,32 +2,53 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
 import { startOfDayBRT, startOfMonthBRT } from '@/lib/format'
 
+const PAGE_SIZE = 20
+
 export async function GET(request: NextRequest) {
   const supabase = getSupabase()
   const { searchParams } = new URL(request.url)
   const period = searchParams.get('period') ?? 'all'
   const payment = searchParams.get('payment') ?? ''
-
-  let query = supabase
-    .from('sales')
-    .select('*, sale_items(*)')
-    .order('created_at', { ascending: false })
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
 
   const now = new Date()
-  if (period === 'today') {
-    query = query.gte('created_at', startOfDayBRT(now).toISOString())
-  } else if (period === 'week') {
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    query = query.gte('created_at', startOfDayBRT(sevenDaysAgo).toISOString())
-  } else if (period === 'month') {
-    query = query.gte('created_at', startOfMonthBRT(now).toISOString())
+  let dateFilter: string | null = null
+  if (period === 'today') dateFilter = startOfDayBRT(now).toISOString()
+  else if (period === 'week') dateFilter = startOfDayBRT(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)).toISOString()
+  else if (period === 'month') dateFilter = startOfMonthBRT(now).toISOString()
+
+  let itemsQuery = supabase
+    .from('sales')
+    .select('*, sale_items(*)', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  let totalsQuery = supabase.from('sales').select('total')
+
+  if (dateFilter) {
+    itemsQuery = itemsQuery.gte('created_at', dateFilter)
+    totalsQuery = totalsQuery.gte('created_at', dateFilter)
+  }
+  if (payment) {
+    itemsQuery = itemsQuery.eq('payment_method', payment)
+    totalsQuery = totalsQuery.eq('payment_method', payment)
   }
 
-  if (payment) query = query.eq('payment_method', payment)
+  const [{ data, error, count }, { data: allTotals }] = await Promise.all([itemsQuery, totalsQuery])
 
-  const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+
+  const totalCount = count ?? 0
+  const totalAmount = allTotals?.reduce((s, r) => s + r.total, 0) ?? 0
+
+  return NextResponse.json({
+    data,
+    totalCount,
+    totalAmount,
+    hasMore: page * PAGE_SIZE < totalCount,
+  })
 }
 
 export async function POST(request: NextRequest) {
