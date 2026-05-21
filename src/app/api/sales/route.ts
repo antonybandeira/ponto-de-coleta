@@ -13,11 +13,25 @@ export async function GET(request: NextRequest) {
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
+  const dateFrom = searchParams.get('date_from') // YYYY-MM-DD
+  const dateTo = searchParams.get('date_to')     // YYYY-MM-DD
+
   const now = new Date()
-  let dateFilter: string | null = null
-  if (period === 'today') dateFilter = startOfDayBRT(now).toISOString()
-  else if (period === 'week') dateFilter = startOfDayBRT(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)).toISOString()
-  else if (period === 'month') dateFilter = startOfMonthBRT(now).toISOString()
+  let startFilter: string | null = null
+  let endFilter: string | null = null
+
+  if (dateFrom || dateTo) {
+    if (dateFrom) startFilter = new Date(dateFrom + 'T03:00:00.000Z').toISOString()
+    if (dateTo) {
+      const end = new Date(dateTo + 'T03:00:00.000Z')
+      end.setUTCDate(end.getUTCDate() + 1)
+      endFilter = end.toISOString()
+    }
+  } else {
+    if (period === 'today') startFilter = startOfDayBRT(now).toISOString()
+    else if (period === 'week') startFilter = startOfDayBRT(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)).toISOString()
+    else if (period === 'month') startFilter = startOfMonthBRT(now).toISOString()
+  }
 
   let itemsQuery = supabase
     .from('sales')
@@ -27,9 +41,13 @@ export async function GET(request: NextRequest) {
 
   let totalsQuery = supabase.from('sales').select('total')
 
-  if (dateFilter) {
-    itemsQuery = itemsQuery.gte('created_at', dateFilter)
-    totalsQuery = totalsQuery.gte('created_at', dateFilter)
+  if (startFilter) {
+    itemsQuery = itemsQuery.gte('created_at', startFilter)
+    totalsQuery = totalsQuery.gte('created_at', startFilter)
+  }
+  if (endFilter) {
+    itemsQuery = itemsQuery.lt('created_at', endFilter)
+    totalsQuery = totalsQuery.lt('created_at', endFilter)
   }
   if (payment) {
     itemsQuery = itemsQuery.eq('payment_method', payment)

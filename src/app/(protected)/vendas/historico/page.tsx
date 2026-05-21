@@ -24,6 +24,8 @@ export default function HistoricoPage() {
   const [sales, setSales] = useState<SaleWithItems[]>([])
   const [period, setPeriod] = useState('month')
   const [payment, setPayment] = useState('Todos')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [totalAmount, setTotalAmount] = useState(0)
@@ -33,10 +35,20 @@ export default function HistoricoPage() {
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  const fetchPage = useCallback((p: number, append: boolean, currentPeriod: string, currentPayment: string) => {
+  const usingDateRange = dateFrom !== '' || dateTo !== ''
+
+  const fetchPage = useCallback((p: number, append: boolean, opts: {
+    period: string; payment: string; dateFrom: string; dateTo: string
+  }) => {
     setLoading(true)
-    const params = new URLSearchParams({ period: currentPeriod, page: String(p) })
-    if (currentPayment !== 'Todos') params.set('payment', currentPayment)
+    const params = new URLSearchParams({ page: String(p) })
+    if (opts.dateFrom || opts.dateTo) {
+      if (opts.dateFrom) params.set('date_from', opts.dateFrom)
+      if (opts.dateTo) params.set('date_to', opts.dateTo)
+    } else {
+      params.set('period', opts.period)
+    }
+    if (opts.payment !== 'Todos') params.set('payment', opts.payment)
     fetch(`/api/sales?${params}`)
       .then(r => r.json())
       .then(({ data, hasMore, totalAmount, totalCount }: ApiResponse) => {
@@ -50,8 +62,19 @@ export default function HistoricoPage() {
   }, [])
 
   useEffect(() => {
-    fetchPage(1, false, period, payment)
-  }, [period, payment, fetchPage])
+    fetchPage(1, false, { period, payment, dateFrom, dateTo })
+  }, [period, payment, dateFrom, dateTo, fetchPage])
+
+  function handlePeriodClick(value: string) {
+    setDateFrom('')
+    setDateTo('')
+    setPeriod(value)
+  }
+
+  function clearDateRange() {
+    setDateFrom('')
+    setDateTo('')
+  }
 
   async function handleDelete() {
     if (!confirmId) return
@@ -61,7 +84,7 @@ export default function HistoricoPage() {
     setConfirmId(null)
     if (res.ok) {
       setToast({ msg: 'Venda excluída.', type: 'success' })
-      fetchPage(1, false, period, payment)
+      fetchPage(1, false, { period, payment, dateFrom, dateTo })
     } else {
       setToast({ msg: 'Erro ao excluir venda.', type: 'error' })
     }
@@ -77,18 +100,48 @@ export default function HistoricoPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="flex rounded-lg overflow-hidden border border-gray-200">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className={`flex rounded-lg overflow-hidden border ${usingDateRange ? 'border-gray-200 opacity-50' : 'border-gray-200'}`}>
           {PERIODS.map(p => (
             <button
               key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${period === p.value ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              onClick={() => handlePeriodClick(p.value)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${!usingDateRange && period === p.value ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               {p.label}
             </button>
           ))}
         </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-500 font-medium">De</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-500 font-medium">até</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:border-blue-400"
+            />
+          </div>
+          {usingDateRange && (
+            <button
+              onClick={clearDateRange}
+              className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-2 py-2"
+            >
+              Limpar
+            </button>
+          )}
+        </div>
+
         <select
           value={payment}
           onChange={e => setPayment(e.target.value)}
@@ -151,7 +204,7 @@ export default function HistoricoPage() {
       {hasMore && (
         <div className="text-center">
           <button
-            onClick={() => fetchPage(page + 1, true, period, payment)}
+            onClick={() => fetchPage(page + 1, true, { period, payment, dateFrom, dateTo })}
             disabled={loading}
             className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >

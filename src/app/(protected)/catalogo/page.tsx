@@ -9,6 +9,8 @@ export default function CatalogoPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [editingPrice, setEditingPrice] = useState<string | null>(null)
   const [priceValue, setPriceValue] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // New item form
   const [showForm, setShowForm] = useState(false)
@@ -64,6 +66,20 @@ export default function CatalogoPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!confirmDeleteId) return
+    setDeleting(true)
+    const res = await fetch(`/api/catalog/${confirmDeleteId}`, { method: 'DELETE' })
+    setDeleting(false)
+    setConfirmDeleteId(null)
+    if (res.ok) {
+      load()
+      setToast({ msg: 'Item excluído.', type: 'success' })
+    } else {
+      setToast({ msg: 'Erro ao excluir item.', type: 'error' })
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -100,6 +116,7 @@ export default function CatalogoPage() {
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Item</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Preço</th>
               <th className="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -137,11 +154,44 @@ export default function CatalogoPage() {
                     {item.active ? 'Ativo' : 'Inativo'}
                   </button>
                 </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => setConfirmDeleteId(item.id)}
+                    className="text-red-400 hover:text-red-600 text-xs font-medium hover:underline"
+                    title="Excluir item"
+                  >
+                    Excluir
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-bold text-gray-800 text-lg">Excluir item?</h3>
+            <p className="text-sm text-gray-500">O item será removido do catálogo. O histórico de vendas que já usou este item será preservado.</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-lg font-medium"
+              >
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
