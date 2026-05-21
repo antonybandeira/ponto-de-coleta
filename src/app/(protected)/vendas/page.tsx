@@ -13,13 +13,24 @@ type CartItem = {
 
 const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Cartão Crédito', 'Cartão Débito']
 
+function defaultDatetime() {
+  const now = new Date()
+  const offset = now.getTimezoneOffset()
+  return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 16)
+}
+
 export default function VendasPage() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [payment, setPayment] = useState('Dinheiro')
   const [notes, setNotes] = useState('')
+  const [saleDate, setSaleDate] = useState(defaultDatetime)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+
+  // Edição de preço no carrinho
+  const [editingPrice, setEditingPrice] = useState<string | null>(null)
+  const [editPriceValue, setEditPriceValue] = useState('')
 
   useEffect(() => {
     fetch('/api/catalog').then(r => r.json()).then((items: CatalogItem[]) =>
@@ -45,6 +56,19 @@ export default function VendasPage() {
     setCart(prev => prev.filter(c => c.id !== id))
   }
 
+  function startEditPrice(item: CartItem) {
+    setEditingPrice(item.id)
+    setEditPriceValue(item.unit_price.toFixed(2).replace('.', ','))
+  }
+
+  function saveEditPrice(id: string) {
+    const parsed = parseFloat(editPriceValue.replace(',', '.'))
+    if (!isNaN(parsed) && parsed > 0) {
+      setCart(prev => prev.map(c => c.id === id ? { ...c, unit_price: parsed } : c))
+    }
+    setEditingPrice(null)
+  }
+
   const total = cart.reduce((s, c) => s + c.unit_price * c.quantity, 0)
 
   const handleFinalize = useCallback(async () => {
@@ -57,6 +81,7 @@ export default function VendasPage() {
         payment_method: payment,
         total,
         notes: notes || null,
+        created_at: new Date(saleDate).toISOString(),
         items: cart.map(c => ({
           catalog_item_id: c.id,
           item_name: c.name,
@@ -71,11 +96,12 @@ export default function VendasPage() {
       setCart([])
       setNotes('')
       setPayment('Dinheiro')
+      setSaleDate(defaultDatetime())
       setToast('Venda registrada com sucesso!')
     } else {
       setToast('Erro ao registrar venda.')
     }
-  }, [cart, payment, total, notes])
+  }, [cart, payment, total, notes, saleDate])
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 min-h-[calc(100vh-80px)]">
@@ -108,7 +134,31 @@ export default function VendasPage() {
               <div key={item.id} className="flex items-center gap-2 text-sm">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.name}</p>
-                  <p className="text-gray-400">{formatCurrency(item.unit_price)} × {item.quantity} = <span className="text-gray-700 font-semibold">{formatCurrency(item.unit_price * item.quantity)}</span></p>
+                  <div className="flex items-center gap-1 text-gray-400">
+                    {editingPrice === item.id ? (
+                      <input
+                        autoFocus
+                        value={editPriceValue}
+                        onChange={e => setEditPriceValue(e.target.value)}
+                        onBlur={() => saveEditPrice(item.id)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') saveEditPrice(item.id)
+                          if (e.key === 'Escape') setEditingPrice(null)
+                        }}
+                        className="border border-blue-400 rounded px-1 py-0.5 text-xs w-16 focus:outline-none text-gray-700"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => startEditPrice(item)}
+                        className="text-blue-600 hover:underline font-medium text-xs"
+                        title="Clique para editar o preço"
+                      >
+                        {formatCurrency(item.unit_price)}
+                      </button>
+                    )}
+                    <span>× {item.quantity} =</span>
+                    <span className="text-gray-700 font-semibold">{formatCurrency(item.unit_price * item.quantity)}</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 flex items-center justify-center">−</button>
@@ -141,6 +191,17 @@ export default function VendasPage() {
               </label>
             ))}
           </div>
+        </div>
+
+        {/* Sale date */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Data da venda</p>
+          <input
+            type="datetime-local"
+            value={saleDate}
+            onChange={e => setSaleDate(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+          />
         </div>
 
         {/* Notes */}

@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
       payment_method: body.payment_method,
       total: body.total,
       notes: body.notes ?? null,
+      ...(body.created_at ? { created_at: body.created_at } : {}),
     })
     .select()
     .single()
