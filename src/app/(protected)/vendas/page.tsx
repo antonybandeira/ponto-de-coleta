@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { formatCurrency } from '@/lib/format'
 import Toast from '@/components/Toast'
 import type { CatalogItem } from '@/lib/supabase'
@@ -27,6 +27,8 @@ export default function VendasPage() {
   const [saleDate, setSaleDate] = useState(defaultDatetime)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [scanValue, setScanValue] = useState('')
+  const scanInputRef = useRef<HTMLInputElement>(null)
 
   // Edição de preço no carrinho
   const [editingPrice, setEditingPrice] = useState<string | null>(null)
@@ -38,12 +40,29 @@ export default function VendasPage() {
     )
   }, [])
 
+  useEffect(() => {
+    scanInputRef.current?.focus()
+  }, [catalog])
+
   function addItem(item: CatalogItem) {
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id)
       if (existing) return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c)
       return [...prev, { id: item.id, name: item.name, unit_price: item.price, quantity: 1 }]
     })
+  }
+
+  function handleScanSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const code = scanValue.trim()
+    setScanValue('')
+    if (!code) return
+    const item = catalog.find(i => i.barcode === code)
+    if (item) {
+      addItem(item)
+    } else {
+      setToast('Código não encontrado.')
+    }
   }
 
   function updateQty(id: string, delta: number) {
@@ -108,6 +127,17 @@ export default function VendasPage() {
       {/* Catalog grid */}
       <div className="flex-1">
         <h2 className="text-lg font-semibold text-gray-700 mb-3">Itens</h2>
+        <form onSubmit={handleScanSubmit} className="mb-3">
+          <input
+            ref={scanInputRef}
+            value={scanValue}
+            onChange={e => setScanValue(e.target.value)}
+            onBlur={() => scanInputRef.current?.focus()}
+            placeholder="Bipe o código de barras aqui..."
+            className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            autoComplete="off"
+          />
+        </form>
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
           {catalog.map(item => (
             <button
