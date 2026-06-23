@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { formatCurrency } from '@/lib/format'
 import Toast from '@/components/Toast'
 import type { CatalogItem } from '@/lib/supabase'
@@ -90,12 +91,26 @@ export default function CatalogoPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Catálogo</h1>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-        >
-          + Novo item
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/catalogo/etiquetas"
+            className="text-sm font-semibold px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Imprimir etiquetas
+          </Link>
+          <Link
+            href="/catalogo/tabela-precos"
+            className="text-sm font-semibold px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Tabela de preços
+          </Link>
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            + Novo item
+          </button>
+        </div>
       </div>
 
       {showForm && (
