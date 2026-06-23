@@ -32,6 +32,12 @@ export default function CatalogoPage() {
     if (res.ok) load()
   }
 
+  async function generateBarcode(item: CatalogItem) {
+    const res = await fetch(`/api/catalog/${item.id}/barcode`, { method: 'POST' })
+    if (res.ok) { load(); setToast({ msg: 'Código gerado!', type: 'success' }) }
+    else setToast({ msg: 'Erro ao gerar código.', type: 'error' })
+  }
+
   function startEditPrice(item: CatalogItem) {
     setEditingPrice(item.id)
     setPriceValue(item.price.toFixed(2).replace('.', ','))
@@ -115,6 +121,7 @@ export default function CatalogoPage() {
             <tr>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Item</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Preço</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Código</th>
               <th className="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -143,6 +150,16 @@ export default function CatalogoPage() {
                       title="Clique para editar"
                     >
                       {formatCurrency(item.price)}
+                    </button>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                  {item.barcode ? item.barcode : (
+                    <button
+                      onClick={() => generateBarcode(item)}
+                      className="text-blue-600 hover:underline font-sans font-medium"
+                    >
+                      Gerar código
                     </button>
                   )}
                 </td>
