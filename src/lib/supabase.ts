@@ -7,6 +7,7 @@ export type CatalogItem = {
   active: boolean
   sort_order: number
   created_at: string
+  barcode: string | null
 }
 
 export type Sale = {
