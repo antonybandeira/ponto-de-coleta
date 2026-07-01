@@ -8,6 +8,7 @@ const links = [
   { href: '/vendas', label: 'Vendas' },
   { href: '/vendas/historico', label: 'Histórico' },
   { href: '/ocorrencias', label: 'Ocorrências' },
+  { href: '/contatos', label: 'Contatos' },
   { href: '/catalogo', label: 'Catálogo' },
 ]
 
