@@ -42,6 +42,15 @@ export type Occurrence = {
   resolution_notes: string | null
 }
 
+export type Contact = {
+  id: string
+  created_at: string
+  name: string
+  nickname: string | null
+  phone: string
+  type: 'vendedor' | 'comprador'
+}
+
 export function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
