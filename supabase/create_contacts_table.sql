@@ -10,10 +10,12 @@ CREATE TABLE public.contacts (
   type       text NOT NULL CHECK (type IN ('vendedor', 'comprador'))
 );
 
--- Mesmo padrão de segurança das outras tabelas: o app usa o SERVICE_ROLE_KEY
--- no servidor (ignora RLS). A política restritiva bloqueia acesso via chave
--- anon/authenticated (client-side).
+-- O app em produção acessa o Supabase com a chave anon/publishable (sujeita a RLS);
+-- a proteção real é o login por PIN no próprio app. Por isso usamos a mesma política
+-- PERMISSIVE "Acesso total" das demais tabelas (sales, occurrences), liberando acesso
+-- via RLS. (NÃO use política restritiva de negação aqui: ela bloquearia os inserts
+-- do app em produção, já que a chave anon não ignora RLS como a service role faz.)
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Sem acesso público" ON public.contacts
-  AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false);
+CREATE POLICY "Acesso total" ON public.contacts
+  AS PERMISSIVE FOR ALL TO public USING (true) WITH CHECK (true);
