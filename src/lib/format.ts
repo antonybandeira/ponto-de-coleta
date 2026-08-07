@@ -37,3 +37,9 @@ export function formatDate(iso: string): string {
 export function formatDateShort(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR')
 }
+
+/** Converte um ISO para o valor de um <input type="datetime-local"> no fuso local. */
+export function isoToDatetimeLocal(iso: string): string {
+  const d = new Date(iso)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}

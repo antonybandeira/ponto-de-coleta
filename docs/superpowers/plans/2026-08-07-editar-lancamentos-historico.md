@@ -105,7 +105,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 Run: `npx tsc --noEmit`
 Expected: sai com código 0, sem erros.
 
-- [ ] **Step 3: Smoke test do endpoint via curl**
+- [ ] **Step 3: Smoke test do endpoint via curl (seguro / auto-limpante)**
+
+⚠️ **O `.env.local` aponta para o Supabase de PRODUÇÃO.** O teste NÃO pode
+alterar uma venda real. Este smoke test **cria uma venda de teste, edita via PUT,
+verifica e apaga** — não toca em nenhum lançamento existente.
 
 Pré-requisito: dev server rodando (`npm run dev`, já em uso nesta sessão) em `http://localhost:3000`.
 
@@ -113,30 +117,31 @@ Rodar (Git Bash), a partir da raiz do projeto:
 
 ```bash
 SECRET=$(grep '^AUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"'"'"'"'\r')
-# Pega o id e os itens de uma venda existente
-SALE=$(curl -s "http://localhost:3000/api/sales?period=all" -H "Cookie: auth_token=$SECRET")
-echo "$SALE" | head -c 400; echo
-ID=$(echo "$SALE" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(j.data[0].id)})")
-echo "ID de teste: $ID"
-# PUT idempotente: reenvia os mesmos itens da 1a venda com pagamento 'Pix'
-echo "$SALE" | node -e "
-let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
-  const sale=JSON.parse(s).data[0];
-  const body={payment_method:'Pix',notes:sale.notes,created_at:sale.created_at,
-    items:sale.sale_items.map(i=>({catalog_item_id:i.catalog_item_id,item_name:i.item_name,unit_price:i.unit_price,quantity:i.quantity}))};
-  process.stdout.write(JSON.stringify(body));
-});" > /tmp/put_body.json
-curl -s -X PUT "http://localhost:3000/api/sales/$ID" -H "Content-Type: application/json" -H "Cookie: auth_token=$SECRET" --data @/tmp/put_body.json
-echo
+BASE=http://localhost:3000
+# 1) cria uma venda de teste (será apagada no fim)
+CREATE=$(curl -s -X POST "$BASE/api/sales" -H "Content-Type: application/json" -H "Cookie: auth_token=$SECRET" \
+  --data '{"payment_method":"Dinheiro","total":10,"notes":"TESTE PUT — apagar","items":[{"item_name":"Teste PUT","unit_price":10,"quantity":1,"subtotal":10}]}')
+ID=$(echo "$CREATE" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).id))")
+echo "venda de teste: $ID"
+# 2) PUT: 2 × 15 = 30, pagamento Pix (total é recalculado no servidor)
+PUT=$(curl -s -X PUT "$BASE/api/sales/$ID" -H "Content-Type: application/json" -H "Cookie: auth_token=$SECRET" \
+  --data '{"payment_method":"Pix","notes":"TESTE PUT editado","items":[{"catalog_item_id":null,"item_name":"Teste PUT","unit_price":15,"quantity":2}]}')
+echo "PUT resp: $PUT"
+# 3) verifica total=30, pagamento=Pix, quantidade=2
+curl -s "$BASE/api/sales?period=all" -H "Cookie: auth_token=$SECRET" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const v=JSON.parse(s).data.find(x=>x.id==='$ID');console.log('CHECK total='+v.total+' pay='+v.payment_method+' qty='+v.sale_items[0].quantity)})"
+# 4) limpa: apaga a venda de teste
+echo "DELETE resp: $(curl -s -X DELETE "$BASE/api/sales/$ID" -H "Cookie: auth_token=$SECRET")"
 ```
 
-Expected: a última linha imprime `{"ok":true}`. (O pagamento da 1ª venda passa a "Pix" e o total é recalculado a partir dos itens.)
+Expected: `PUT resp: {"ok":true}`, depois `CHECK total=30 pay=Pix qty=2`, e `DELETE resp: {"ok":true}`. Nenhum lançamento real é alterado.
 
-- [ ] **Step 4: Teste de validação (deve rejeitar venda sem itens)**
+- [ ] **Step 4: Teste de validação (deve rejeitar venda sem itens — não escreve no banco)**
+
+A checagem de `items` vazio retorna 400 **antes** de qualquer operação no banco, então este teste é seguro mesmo em produção.
 
 ```bash
 SECRET=$(grep '^AUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"'"'"'"'\r')
-curl -s -o /dev/null -w "%{http_code}\n" -X PUT "http://localhost:3000/api/sales/qualquer-id" \
+curl -s -o /dev/null -w "%{http_code}\n" -X PUT "http://localhost:3000/api/sales/00000000-0000-0000-0000-000000000000" \
   -H "Content-Type: application/json" -H "Cookie: auth_token=$SECRET" \
   --data '{"payment_method":"Pix","items":[]}'
 ```
