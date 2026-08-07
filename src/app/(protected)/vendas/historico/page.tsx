@@ -161,37 +161,42 @@ export default function HistoricoPage() {
 
   async function handleSaveEdit() {
     if (!editDraft) return
-    const valid = editDraft.items.length > 0 &&
+    const valid = editDraft.items.length > 0 && editDraft.saleDate.trim() !== '' &&
       editDraft.items.every(it => it.unit_price > 0 && Number.isInteger(it.quantity) && it.quantity >= 1)
     if (!valid) return
     setSaving(true)
-    const res = await fetch(`/api/sales/${editDraft.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        payment_method: editDraft.payment_method,
-        notes: editDraft.notes || null,
-        created_at: new Date(editDraft.saleDate).toISOString(),
-        items: editDraft.items.map(it => ({
-          catalog_item_id: it.catalog_item_id,
-          item_name: it.item_name,
-          unit_price: it.unit_price,
-          quantity: it.quantity,
-        })),
-      }),
-    })
-    setSaving(false)
-    if (res.ok) {
-      setEditDraft(null)
-      setToast({ msg: 'Venda atualizada.', type: 'success' })
-      fetchPage(1, false, { period, payment, dateFrom, dateTo })
-    } else {
+    try {
+      const res = await fetch(`/api/sales/${editDraft.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payment_method: editDraft.payment_method,
+          notes: editDraft.notes || null,
+          created_at: new Date(editDraft.saleDate).toISOString(),
+          items: editDraft.items.map(it => ({
+            catalog_item_id: it.catalog_item_id,
+            item_name: it.item_name,
+            unit_price: it.unit_price,
+            quantity: it.quantity,
+          })),
+        }),
+      })
+      if (res.ok) {
+        setEditDraft(null)
+        setToast({ msg: 'Venda atualizada.', type: 'success' })
+        fetchPage(1, false, { period, payment, dateFrom, dateTo })
+      } else {
+        setToast({ msg: 'Erro ao atualizar venda.', type: 'error' })
+      }
+    } catch {
       setToast({ msg: 'Erro ao atualizar venda.', type: 'error' })
+    } finally {
+      setSaving(false)
     }
   }
 
   const draftTotal = editDraft?.items.reduce((s, it) => s + it.unit_price * it.quantity, 0) ?? 0
-  const draftValid = !!editDraft && editDraft.items.length > 0 &&
+  const draftValid = !!editDraft && editDraft.items.length > 0 && editDraft.saleDate.trim() !== '' &&
     editDraft.items.every(it => it.unit_price > 0 && Number.isInteger(it.quantity) && it.quantity >= 1)
 
   return (
