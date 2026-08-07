@@ -7,8 +7,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'PIN incorreto' }, { status: 401 })
   }
 
+  const secret = process.env.AUTH_SECRET
+  if (!secret) return NextResponse.json({ error: 'Configuração inválida' }, { status: 500 })
+
   const res = NextResponse.json({ ok: true })
-  res.cookies.set('auth_token', process.env.AUTH_SECRET!, {
+  res.cookies.set('auth_token', secret, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
