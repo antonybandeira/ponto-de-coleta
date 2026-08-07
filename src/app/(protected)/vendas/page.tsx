@@ -132,7 +132,13 @@ export default function VendasPage() {
             ref={scanInputRef}
             value={scanValue}
             onChange={e => setScanValue(e.target.value)}
-            onBlur={() => scanInputRef.current?.focus()}
+            onBlur={e => {
+              // Mantém o scanner "sempre pronto", mas não rouba o foco quando o
+              // operador está editando outro campo (preço, data, observações...).
+              const next = e.relatedTarget as HTMLElement | null
+              if (next && next.matches('input, textarea, select, [contenteditable]')) return
+              scanInputRef.current?.focus()
+            }}
             placeholder="Bipe o código de barras aqui..."
             className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
             autoComplete="off"
